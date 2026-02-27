@@ -1,4 +1,7 @@
 import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, random_split
 import numpy as np
 
 #Q1
@@ -9,11 +12,31 @@ class UWaveGestureLibraryDataset(torch.utils.data.Dataset):
   def __init__(self, dataset_filepath):
     # dataset_filepath is the full path to a file containing data
 
-    raw_data = np.loadtxt(dataset_filepath, delimiter=',')
+    samples_list = []
+    labels_list = []
 
-    self.samples = torch.tensor(raw_data[:, :-1], dtype=torch.float32)
-    self.labels = torch.tensor(raw_data[:, -1], dtype=torch.long)
+    # Read file line-by-line because data is not a true CSV
+    with open(dataset_filepath, "r") as f:
+      for line in f:
+        line = line.strip()
 
+        # Split features and label using colon
+        features_part, label_part = line.split(":")
+
+        # Convert comma-separated features to float array
+        features = np.array(features_part.split(","), dtype=np.float32)
+
+        # Convert label to integer
+        label = int(float(label_part))
+
+        samples_list.append(features)
+        labels_list.append(label)
+
+    # Convert to tensors
+    self.samples = torch.tensor(samples_list, dtype=torch.float32)
+    self.labels = torch.tensor(labels_list, dtype=torch.long)
+
+    # Convert labels from 1–8 to 0–7 if necessary
     if torch.min(self.labels) == 1:
       self.labels = self.labels - 1
 
@@ -47,10 +70,6 @@ class UWaveGestureLibraryDataset(torch.utils.data.Dataset):
 def u_wave_gesture_library_cnn_model(training_data_filepath):
   # training_data_filepath is the full path to a file containing the training data
 
-  import torch.nn as nn
-  import torch.optim as optim
-  from torch.utils.data import DataLoader, random_split
-
   data_obj = UWaveGestureLibraryDataset(training_data_filepath)
 
   train_count = int(0.8 * len(data_obj))
@@ -74,7 +93,8 @@ def u_wave_gesture_library_cnn_model(training_data_filepath):
       self.layer2 = nn.Conv1d(16, 32, kernel_size=3, padding=1)
       self.pool2 = nn.MaxPool1d(2)
 
-      new_len = seq_len // 4
+      # After two MaxPool1d(2) layers, sequence length is reduced by factor of 4
+      new_len = seq_len // 2 // 2
 
       self.hidden = nn.Linear(32 * new_len, 128)
       self.output = nn.Linear(128, class_count)
@@ -86,7 +106,9 @@ def u_wave_gesture_library_cnn_model(training_data_filepath):
       x = torch.relu(self.layer2(x))
       x = self.pool2(x)
 
-      x = x.view(x.size(0), -1)
+      # Flatten before fully connected layers
+      x = x.reshape(x.size(0), -1)
+
       x = torch.relu(self.hidden(x))
       x = self.output(x)
 
