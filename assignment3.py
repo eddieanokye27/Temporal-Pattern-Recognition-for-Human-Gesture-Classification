@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
+import torch.nn.functional as F
 import numpy as np
 
 import os
@@ -62,6 +63,7 @@ class UWaveGestureLibraryDataset(torch.utils.data.Dataset):
         # index is the index of the sample to be retrieved
 
         x = self.samples[index]
+        x = x.T  
 
         class_id = self.labels[index]
         y = torch.zeros(self.total_classes, dtype=torch.float32)
@@ -78,8 +80,8 @@ def u_wave_gesture_library_cnn_model(training_data_filepath):
 
   data_obj = UWaveGestureLibraryDataset(training_data_filepath)
 
-  train_count = int(0.8 * len(data_obj))
-  val_count = len(data_obj) - train_count
+  train_count = int(0.8 * data_obj.__len__())
+  val_count = data_obj.__len__() - train_count
   train_part, val_part = random_split(data_obj, [train_count, val_count])
 
   train_batches = DataLoader(train_part, batch_size=32, shuffle=True)
@@ -88,37 +90,40 @@ def u_wave_gesture_library_cnn_model(training_data_filepath):
   seq_len = data_obj.samples.shape[1]
   class_count = data_obj.total_classes
 
-
+  #Define CNN architecture
+  #Note: Batch normalization is used to stabilize and accelerate training by normalizing the inputs of each layer. In this model, batch normalization is applied after each convolutional layer to improve training stability and performance.
+  #Observe this article if you want: https://salsabilabasalamah.medium.com/improving-training-stability-convolutional-neural-networks-and-batch-normalization-synergy-1bb6ad7a6d03
   class SimpleCNN(nn.Module):
     def __init__(self):
-      super(SimpleCNN, self).__init__()
+        super(SimpleCNN, self).__init__()
 
-      self.layer1 = nn.Conv1d(1, 16, kernel_size=3, padding=1)
-      self.pool1 = nn.MaxPool1d(2)
+        self.conv1 = nn.Conv1d(3, 32, 7)
+        self.bn1 = nn.BatchNorm1d(32)
+        self.pool1 = nn.MaxPool1d(2)
 
-      self.layer2 = nn.Conv1d(16, 32, kernel_size=3, padding=1)
-      self.pool2 = nn.MaxPool1d(2)
+        self.conv2 = nn.Conv1d(32, 64, 5)
+        self.bn2 = nn.BatchNorm1d(64)
+        self.pool2 = nn.MaxPool1d(2)
 
-      # After two MaxPool1d(2) layers, sequence length is reduced by factor of 4
-      new_len = seq_len // 2 // 2
+        self.conv3 = nn.Conv1d(64, 128, 3)
+        self.bn3 = nn.BatchNorm1d(128)
+        self.pool3 = nn.MaxPool1d(2)
 
-      self.hidden = nn.Linear(32 * new_len, 128)
-      self.output = nn.Linear(128, class_count)
+        self.fc1 = nn.Linear(128 * 36, 128)
+        self.dropout = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(128, 8)
 
     def forward(self, x):
-      x = torch.relu(self.layer1(x))
-      x = self.pool1(x)
+        x = self.pool1(F.relu(self.bn1(self.conv1(x))))
+        x = self.pool2(F.relu(self.bn2(self.conv2(x))))
+        x = self.pool3(F.relu(self.bn3(self.conv3(x))))
 
-      x = torch.relu(self.layer2(x))
-      x = self.pool2(x)
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
 
-      # Flatten before fully connected layers
-      x = x.reshape(x.size(0), -1)
-
-      x = torch.relu(self.hidden(x))
-      x = self.output(x)
-
-      return x
+        return x
 
   model = SimpleCNN()
 
@@ -248,5 +253,11 @@ def u_wave_gesture_library_rnn_model(training_data_filepath):
 
   return model, training_performance, validation_performance
 
-u_wave_gesture_library_rnn_model(f"{os.getcwd()}\\UWaveGestureLibrary_TRAIN.csv")
-# u_wave_gesture_library_cnn_model(f"{os.getcwd()}\\UWaveGestureLibrary_TRAIN.csv")
+if __name__ == "__main__":
+  # build the training file path in a cross-platform way
+  train_path = os.path.join(os.getcwd(), "UWaveGestureLibrary_TRAIN.csv")
+
+  # Call the RNN (or CNN) using the constructed path. These should only run
+  # when the script is executed directly, not on import.
+  u_wave_gesture_library_rnn_model(train_path)
+  # u_wave_gesture_library_cnn_model(train_path)
