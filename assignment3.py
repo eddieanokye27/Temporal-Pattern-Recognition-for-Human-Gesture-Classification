@@ -1,15 +1,54 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
+import random
 import torch.nn.functional as F
 import numpy as np
+from sklearn.model_selection import train_test_split
 
 import os
 
+seed = 21
+torch.manual_seed(seed)
+np.random.seed(seed)
+random.seed(seed)
+
+# stratified_split:
+
+# This often be used as a way to boost validation accuracy a lot for small datasets.
+# written by chatgpt (give credit to him)
+def stratified_split(dataset, val_ratio=0.2, seed=42):
+
+    rng = np.random.default_rng(seed)
+
+    labels = dataset.labels.numpy()
+
+    train_indices = []
+    val_indices = []
+
+    classes = np.unique(labels)
+
+    for c in classes:
+        idx = np.where(labels == c)[0]
+
+        rng.shuffle(idx)
+
+        n_val = int(val_ratio * len(idx))
+
+        val_indices.extend(idx[:n_val])
+        train_indices.extend(idx[n_val:])
+
+    rng.shuffle(train_indices)
+    rng.shuffle(val_indices)
+
+    train_subset = Subset(dataset, train_indices)
+    val_subset = Subset(dataset, val_indices)
+
+    return train_subset, val_subset
+
 #Q1
 
-# PyTorch dataset for the UWaveGestureLibrary dataset
 class UWaveGestureLibraryDataset(torch.utils.data.Dataset):
 
     def __init__(self, dataset_filepath):
@@ -41,8 +80,8 @@ class UWaveGestureLibraryDataset(torch.utils.data.Dataset):
                 samples_list.append(features)
                 labels_list.append(label)
 
-        # Convert to tensors
         samples_list = np.array(samples_list)
+        # Convert to tensors
         self.samples = torch.tensor(samples_list, dtype=torch.float32)
         self.labels = torch.tensor(labels_list, dtype=torch.long)
 
@@ -63,10 +102,6 @@ class UWaveGestureLibraryDataset(torch.utils.data.Dataset):
         # index is the index of the sample to be retrieved
 
         x = self.samples[index]
-<<<<<<< HEAD
-=======
-        x = x.T  
->>>>>>> 5069e19897dc4acb13df9426a5d3d6ccc503619a
 
         class_id = self.labels[index]
         y = torch.zeros(self.total_classes, dtype=torch.float32)
@@ -100,14 +135,9 @@ def u_wave_gesture_library_cnn_model(training_data_filepath):
     def __init__(self):
         super(SimpleCNN, self).__init__()
 
-<<<<<<< HEAD
-      self.layer1 = nn.Conv1d(315, 16, kernel_size=3, padding=1)
-      self.pool1 = nn.MaxPool1d(2)
-=======
         self.conv1 = nn.Conv1d(3, 32, 7)
         self.bn1 = nn.BatchNorm1d(32)
         self.pool1 = nn.MaxPool1d(2)
->>>>>>> 5069e19897dc4acb13df9426a5d3d6ccc503619a
 
         self.conv2 = nn.Conv1d(32, 64, 5)
         self.bn2 = nn.BatchNorm1d(64)
@@ -131,11 +161,8 @@ def u_wave_gesture_library_cnn_model(training_data_filepath):
         x = self.dropout(x)
         x = self.fc2(x)
 
-<<<<<<< HEAD
-=======
         return x
 
->>>>>>> 5069e19897dc4acb13df9426a5d3d6ccc503619a
   model = SimpleCNN()
 
   loss_function = nn.CrossEntropyLoss()
@@ -186,93 +213,37 @@ def u_wave_gesture_library_cnn_model(training_data_filepath):
 def u_wave_gesture_library_rnn_model(training_data_filepath):
   data_obj = UWaveGestureLibraryDataset(training_data_filepath)
 
-<<<<<<< HEAD
-  feature, label = data_obj[0]
-=======
->>>>>>> 5069e19897dc4acb13df9426a5d3d6ccc503619a
   train_count = int(0.8 * len(data_obj))
   val_count = len(data_obj) - train_count
-  train_part, val_part = random_split(data_obj, [train_count, val_count])
+  # train_part, val_part = random_split(data_obj, [train_count, val_count])
+  train_idx, validation_idx = train_test_split(
+        np.arange(len(data_obj)),
+        test_size=0.2,
+        random_state=seed,
+        shuffle=True,
+        stratify=data_obj.labels.numpy(),
+    )
+  train_part = Subset(data_obj, train_idx)
+  val_part = Subset(data_obj, validation_idx)
 
   train_batches = DataLoader(train_part, batch_size=32, shuffle=True)
   val_batches = DataLoader(val_part, batch_size=32, shuffle=False)
 
   seq_len = data_obj.samples.shape[1]
   class_count = data_obj.total_classes
-<<<<<<< HEAD
-  rnn_features = 64
-
-  class VanillaRNN(nn.Module):
-    def __init__(self):
-      super(VanillaRNN, self).__init__()
-      self.layer1 = nn.RNN(3, rnn_features, batch_first=True)
-
-      #needed for consolidation
-      self.output = nn.Linear(rnn_features, class_count)
-      self.relu = nn.ReLU()
-    
-    def forward(self, x):
-      x, _ = self.layer1(x)
-
-      #Many to One Implementation
-      x = x[:, -1, :]
-      x = self.output(x)
-      x = self.relu(x)
-
-      return x
-
-  class LSTM(nn.Module):
-    def __init__(self):
-      super(LSTM, self).__init__()
-      self.layer1 = nn.LSTM(3, rnn_features, batch_first=True)
-
-      #needed for consolidation
-      self.output = nn.Linear(rnn_features, class_count)
-      self.relu = nn.ReLU()
-
-    def forward(self, x):
-      x, _ = self.layer1(x)
-
-      #Many to One Implementation
-      x = x[:, -1, :]
-      x = self.output(x)
-      x = self.relu(x)
-
-      return x
-
-  class GRU(nn.Module):
-    def __init__(self):
-      super(GRU, self).__init__()
-      self.layer1 = nn.GRU(3, rnn_features, batch_first=True)
-
-      #needed for consolidation
-      self.output = nn.Linear(rnn_features, class_count)
-      self.relu = nn.ReLU()
-
-    
-    def forward(self, x):
-      x, _ = self.layer1(x)
-
-      #Many to One Implementation
-      x = x[:, -1, :]
-      x = self.output(x)
-      x = self.relu(x)
-=======
 
   class SimpleRNN(nn.Module):
     def __init__(self):
       super(SimpleRNN, self).__init__()
-      self.layer1 = nn.RNN(3, 16, batch_first=True)
+      self.layer1 = nn.GRU(input_size=3, hidden_size=128, num_layers=2, batch_first=True)
 
       #needed for consolidation
-      self.output = nn.Linear(16, class_count)
-    
+      self.output = nn.Linear(128, class_count)
     def forward(self, x):
       # print(x)
       x, _ = self.layer1(x)
       x = x[:, -1, :]
       x = self.output(x)
->>>>>>> 5069e19897dc4acb13df9426a5d3d6ccc503619a
 
       return x
 
@@ -281,73 +252,13 @@ def u_wave_gesture_library_rnn_model(training_data_filepath):
   # model is a trained rnn model to predict which class a sequence corresponds to
   # training_performance is the performance of the model on the training set
   # validation_performance is the performance of the model on the validation set
-<<<<<<< HEAD
-  VanillaRNN1 = VanillaRNN()
-  LSTM1 = LSTM()
-  GRU1 = GRU()
-  models = [VanillaRNN1, LSTM1, GRU1]
-  convenience = 0
-  for model in models:
-  # model = LSTM()
-
-    loss_function = nn.CrossEntropyLoss()
-    optimiser = optim.Adam(model.parameters(), lr=0.001)
-
-    num_epochs = 60
-
-    for _ in range(num_epochs):
-      model.train()
-      for batch_x, batch_y in train_batches:
-        true_classes = torch.argmax(batch_y, dim=1)
-
-        batch_x = batch_x.squeeze(1)
-        preds = model(batch_x)
-
-        loss = loss_function(preds, true_classes)
-
-        optimiser.zero_grad()
-        loss.backward()
-        optimiser.step()
-
-
-    def check_accuracy(loader):
-      model.eval()
-      correct = 0
-      total = 0
-
-      with torch.no_grad():
-        for batch_x, batch_y in loader:
-          true_classes = torch.argmax(batch_y, dim=1)
-          preds = model(batch_x)
-          predicted_classes = torch.argmax(preds, dim=1)
-          correct += (predicted_classes == true_classes).sum().item()
-          total += true_classes.size(0)
-
-      return correct / total
-
-    training_performance = check_accuracy(train_batches)
-    validation_performance = check_accuracy(val_batches)
-
-    # print(training_performance)
-    # print(validation_performance)
-    modelers = ["Vanilla", "LSTM", "GRU"]
-    print(f"""{modelers[convenience]}: 
-    Training - {training_performance}
-    Validation - {validation_performance}
-    """)
-    convenience += 1
-  return model, training_performance, validation_performance
-
-u_wave_gesture_library_rnn_model(f"{os.getcwd()}\\UWaveGestureLibrary_TRAIN.csv")
-# u_wave_gesture_library_cnn_model(f"{os.getcwd()}\\UWaveGestureLibrary_TRAIN.csv")
-=======
 
   model = SimpleRNN()
 
   loss_function = nn.CrossEntropyLoss()
-  optimiser = optim.Adam(model.parameters(), lr=0.001)
+  optimiser = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
 
-  num_epochs = 10
+  num_epochs = 70
 
   for _ in range(num_epochs):
     model.train()
@@ -388,12 +299,31 @@ u_wave_gesture_library_rnn_model(f"{os.getcwd()}\\UWaveGestureLibrary_TRAIN.csv"
 
   return model, training_performance, validation_performance
 
+def check_accuracy(loader):
+    model.eval()
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+      for batch_x, batch_y in loader:
+        true_classes = torch.argmax(batch_y, dim=1)
+        preds = model(batch_x)
+        predicted_classes = torch.argmax(preds, dim=1)
+
+        correct += (predicted_classes == true_classes).sum().item()
+        total += true_classes.size(0)
+
+    return correct / total
+
 if __name__ == "__main__":
   # build the training file path in a cross-platform way
   train_path = os.path.join(os.getcwd(), "UWaveGestureLibrary_TRAIN.csv")
 
   # Call the RNN (or CNN) using the constructed path. These should only run
   # when the script is executed directly, not on import.
-  u_wave_gesture_library_rnn_model(train_path)
+  model, _, _ = u_wave_gesture_library_rnn_model(train_path)
   # u_wave_gesture_library_cnn_model(train_path)
->>>>>>> 5069e19897dc4acb13df9426a5d3d6ccc503619a
+  data_obj = UWaveGestureLibraryDataset(os.path.join(os.getcwd(), "UWaveGestureLibrary_TEST.csv"))
+  test_batches = DataLoader(data_obj, batch_size=32, shuffle=True)
+  accuracy = check_accuracy(test_batches)
+  print(accuracy)
