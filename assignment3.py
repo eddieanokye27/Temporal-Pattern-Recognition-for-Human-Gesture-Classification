@@ -127,6 +127,7 @@ def u_wave_gesture_library_cnn_model(training_data_filepath):
 
   seq_len = data_obj.samples.shape[1]
   class_count = data_obj.total_classes
+  kernels =[3,3,3]
 
   #Define CNN architecture
   #Note: Batch normalization is used to stabilize and accelerate training by normalizing the inputs of each layer. In this model, batch normalization is applied after each convolutional layer to improve training stability and performance.
@@ -134,22 +135,30 @@ def u_wave_gesture_library_cnn_model(training_data_filepath):
   class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
-
-        self.conv1 = nn.Conv1d(3, 32, 7)
+        k1, k2, k3 = kernels
+        self.conv1 = nn.Conv1d(3, 32, k1)
         self.bn1 = nn.BatchNorm1d(32)
         self.pool1 = nn.MaxPool1d(2)
 
-        self.conv2 = nn.Conv1d(32, 64, 5)
+        self.conv2 = nn.Conv1d(32, 64, k2)
         self.bn2 = nn.BatchNorm1d(64)
         self.pool2 = nn.MaxPool1d(2)
 
-        self.conv3 = nn.Conv1d(64, 128, 3)
+        self.conv3 = nn.Conv1d(64, 128, k3)
         self.bn3 = nn.BatchNorm1d(128)
         self.pool3 = nn.MaxPool1d(2)
 
-        self.fc1 = nn.Linear(128 * 36, 128)
+        fake_tensor = torch.zeros(1, 3, seq_len)
+        fake_tensor = self.pool1(F.relu(self.bn1(self.conv1(fake_tensor))))
+        fake_tensor = self.pool2(F.relu(self.bn2(self.conv2(fake_tensor))))
+        fake_tensor = self.pool3(F.relu(self.bn3(self.conv3(fake_tensor))))
+
+        self.flatten_size = fake_tensor.view(1, -1).shape[1]
+
+
+        self.fc1 = nn.Linear(self.flatten_size, 128)
         self.dropout = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(128, 8)
+        self.fc2 = nn.Linear(128, class_count)
 
     def forward(self, x):
         x = self.pool1(F.relu(self.bn1(self.conv1(x))))
@@ -168,7 +177,7 @@ def u_wave_gesture_library_cnn_model(training_data_filepath):
   loss_function = nn.CrossEntropyLoss()
   optimiser = optim.Adam(model.parameters(), lr=0.001)
 
-  num_epochs = 10
+  num_epochs = 60
 
   for _ in range(num_epochs):
     model.train()
