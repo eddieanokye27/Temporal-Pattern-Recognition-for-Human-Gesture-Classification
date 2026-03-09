@@ -189,6 +189,8 @@ def u_wave_gesture_library_cnn_model(training_data_filepath):
 def u_wave_gesture_library_rnn_model(training_data_filepath):
   data_obj = UWaveGestureLibraryDataset(training_data_filepath)
 
+  # give credit to use stratified split
+  # https://discuss.pytorch.org/t/how-to-do-a-stratified-split/62290
   train_idx, validation_idx = train_test_split(
         np.arange(len(data_obj)),
         test_size=0.2,
