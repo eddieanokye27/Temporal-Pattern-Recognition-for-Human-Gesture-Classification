@@ -14,39 +14,6 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 
-# stratified_split:
-
-# This often be used as a way to boost validation accuracy a lot for small datasets.
-# written by chatgpt (give credit to him)
-def stratified_split(dataset, val_ratio=0.2, seed=42):
-
-    rng = np.random.default_rng(seed)
-
-    labels = dataset.labels.numpy()
-
-    train_indices = []
-    val_indices = []
-
-    classes = np.unique(labels)
-
-    for c in classes:
-        idx = np.where(labels == c)[0]
-
-        rng.shuffle(idx)
-
-        n_val = int(val_ratio * len(idx))
-
-        val_indices.extend(idx[:n_val])
-        train_indices.extend(idx[n_val:])
-
-    rng.shuffle(train_indices)
-    rng.shuffle(val_indices)
-
-    train_subset = Subset(dataset, train_indices)
-    val_subset = Subset(dataset, val_indices)
-
-    return train_subset, val_subset
-
 #Q1
 
 class UWaveGestureLibraryDataset(torch.utils.data.Dataset):
@@ -222,9 +189,6 @@ def u_wave_gesture_library_cnn_model(training_data_filepath):
 def u_wave_gesture_library_rnn_model(training_data_filepath):
   data_obj = UWaveGestureLibraryDataset(training_data_filepath)
 
-  train_count = int(0.8 * len(data_obj))
-  val_count = len(data_obj) - train_count
-  # train_part, val_part = random_split(data_obj, [train_count, val_count])
   train_idx, validation_idx = train_test_split(
         np.arange(len(data_obj)),
         test_size=0.2,
