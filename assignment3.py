@@ -204,7 +204,7 @@ def u_wave_gesture_library_rnn_model(training_data_filepath):
   train_batches = DataLoader(train_part, batch_size=32, shuffle=True)
   val_batches = DataLoader(val_part, batch_size=32, shuffle=False)
 
-  seq_len = data_obj.samples.shape[1]
+
   class_count = data_obj.total_classes
 
   class SimpleRNN(nn.Module):
